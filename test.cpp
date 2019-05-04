@@ -7,6 +7,8 @@
 
 TEST_CASE( "Board Functionality" )
 {
+    Board b[2];
+    std::cout << sizeof( b ) << "\n";
     Board board;
 
     SECTION( "Zero Initialized" )
@@ -48,6 +50,15 @@ TEST_CASE( "Board Functionality" )
         board.setSquareAt( 1, 0, Board::Player::X );
         board.setSquareAt( 2, 0, Board::Player::X );
         REQUIRE( board.getWinner() == Board::Player::X );
+    }
+
+    SECTION( "Basic Gameplay" )
+    {
+        board.makeMove( 0, 0 );
+        board.makeMove( 2, 2 );
+        REQUIRE( board.getSquareAt( 0, 0 ) == Board::Player::X );
+        REQUIRE( board.getSquareAt( 2, 2 ) == Board::Player::O );
+        REQUIRE( board.getTurn() == true );
     }
 }
 

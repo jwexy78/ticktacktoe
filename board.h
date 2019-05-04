@@ -14,7 +14,7 @@ public:
         None = 0,
         X = 1,
         O = 2,
-        Unknown
+        Unknown = 3
     };
 
     enum GameWinner : char {
@@ -22,6 +22,12 @@ public:
         P1 = Player::X,
         P2 = Player::O
     };
+
+    static constexpr uint32_t BITS_PER_SQUARE = 2;
+    static constexpr uint32_t SQUARE_MASK = 0b11;
+    static constexpr uint32_t TURN_MASK = 0b1 << 31;
+    static constexpr uint32_t WINNER_OFFSET = 29;
+    static constexpr uint32_t WINNER_MASK = 0b11 << WINNER_OFFSET;
 
     Board();
 
@@ -40,22 +46,19 @@ public:
     std::string toString() const;
 
 private:
-
-    Player turn_;
-    Player squares_[9];
-    Player winner_;
+    // Holds the squares of the game
+    // From MSB -> MSB, looks like ... <0,1><2,0:2><1,0:2><0,0:2>
+    uint32_t data_;
 };
 
 Board::Board()
-: turn_( Player::X )
-, squares_{ Player::None }
-, winner_( Player::None )
+: data_( TURN_MASK )
 {
 }
 
 bool Board::getTurn() const
 {
-    return turn_ == Player::X;
+    return !!( data_ & TURN_MASK );
 }
 
 std::vector<Board> Board::getMoves() const
@@ -79,9 +82,10 @@ std::vector<Board> Board::getMoves() const
 void Board::makeMove( unsigned int x, unsigned int y )
 {
     assert( getSquareAt( x, y ) == Player::None );
-    setSquareAt( x, y, turn_ );
-    turn_ = ( turn_ == Player::X ? Player::O : Player::X );
-    winner_ = getWinner();
+    setSquareAt( x, y, ( getTurn() ? Player::X : Player::O ) );
+    data_ = data_ ^ TURN_MASK;
+    Player winner = getWinner();
+    data_ = ( data_ & (~WINNER_MASK) ) | ( winner << WINNER_OFFSET );
 }
 
 int Board::getScore() const
@@ -90,7 +94,7 @@ int Board::getScore() const
     if( winner == Player::None ) {
         return 0;
     }
-    if( winner == turn_ ) {
+    if( winner == ( getTurn() ? Player::X : Player::O ) ) {
         return 1;
     } else {
         return -1;
@@ -100,14 +104,20 @@ int Board::getScore() const
 Board::Player Board::getSquareAt( unsigned int x, unsigned int y ) const
 {
     assert( x < 3 && y < 3 );
-    return squares_[3 * y + x];
+    int offset = 3 * y + x;
+    int shiftDistance = offset * BITS_PER_SQUARE;
+    int masked = data_ & ( SQUARE_MASK << shiftDistance );
+    return (Board::Player)( masked >> shiftDistance );
 }
 
 void Board::setSquareAt( unsigned int x, unsigned int y, Board::Player value )
 {
     assert( x < 3 && y < 3 );
-    winner_ = Player::Unknown;
-    squares_[3 * y + x] = value;
+    data_ = ( data_ & (~WINNER_MASK) ) | ( Player::Unknown << WINNER_OFFSET );
+    int offset = 3 * y + x;
+    int shiftDistance = offset * BITS_PER_SQUARE;
+    int masked = data_ & ( ~( SQUARE_MASK << shiftDistance ) );
+    data_ = masked | ( value << shiftDistance );
 }
 
 Board::GameWinner Board::getGameWinner() const
@@ -124,8 +134,9 @@ Board::GameWinner Board::getGameWinner() const
 
 Board::Player Board::getWinner() const
 {
-    if( winner_ != Player::Unknown ) {
-        return winner_;
+    Player winner = (Player)( ( data_ & WINNER_MASK ) >> WINNER_OFFSET );
+    if( winner != Player::Unknown ) {
+        return winner;
     }
     for( unsigned int x = 0; x < 3; ++x ) {
         if( getSquareAt( x, 0 ) == getSquareAt( x, 1 ) &&
