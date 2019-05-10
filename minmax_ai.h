@@ -12,14 +12,15 @@ class MinMaxAI : public GamePlayer<GameType>
 public:
     GameType makeMove( const GameType& currentState )
     {
-        std::vector<GameType> moves = currentState.getMoves();
-        int bestScore = score( moves[0], false );
-        GameType bestPick = moves[0];
-        for( int i = 0; i < moves.size(); ++i ) {
-            int s = score( moves[i], false );
-            // std::cout << moves[i].toString() << " score: " << s << "\n";
+        auto itr = currentState.getMovesItr();
+        Board board;
+        assert( itr.next( board ) );
+        int bestScore = score( board, false );
+        GameType bestPick = board;
+        while( itr.next( board ) ) {
+            int s = score( board, false );
             if( s > bestScore ) {
-                bestPick = moves[i];
+                bestPick = board;
                 bestScore = s;
             }
         }
@@ -28,16 +29,17 @@ public:
 private:
     int score( const GameType& state, bool isMyTurn )
     {
-        std::vector<GameType> moves = state.getMoves();
-        if( moves.size() == 0 ) {
+        auto itr = state.getMovesItr();
+        Board board;
+        if( !itr.next( board ) ) {
             if( state.getGameWinner() != GameType::GameWinner::Tie ) {
                 return ( isMyTurn ? 1 : -1 ) * state.getScore();
             }
             return 0;
         }
-        int bestScore = score( moves[0], !isMyTurn );
-        for( int i = 1; i < moves.size(); ++i ) {
-            int s = score( moves[i], !isMyTurn );
+        int bestScore = score( board, !isMyTurn );
+        while( itr.next( board ) ) {
+            int s = score( board, !isMyTurn );
             if( isMyTurn && s > bestScore ) {
                 bestScore = s;
             } else if( !isMyTurn && s < bestScore ) {

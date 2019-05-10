@@ -10,6 +10,19 @@
 class Board
 {
 public:
+    class MoveIterator
+    {
+    public:
+        MoveIterator( const Board* board );
+        bool next( Board& out );
+
+    private:
+        // Pointer to board that created the allocator
+        const Board* board_;
+        unsigned int x_;
+        unsigned int y_;
+    };
+
     enum Player : char {
         None = 0,
         X = 1,
@@ -34,6 +47,7 @@ public:
     // Required functions for being a Game
     bool getTurn() const;
     std::vector<Board> getMoves() const;
+    MoveIterator getMovesItr() const;
     int getScore() const;
     GameWinner getGameWinner() const;
 
@@ -51,6 +65,37 @@ private:
     uint32_t data_;
 };
 
+Board::MoveIterator::MoveIterator( const Board* board )
+: board_( board )
+, x_( 0 )
+, y_( 0 )
+{
+}
+
+bool Board::MoveIterator::next( Board& out )
+{
+    // If the board has a winner, there are no legal moves
+    if( board_->getWinner() != Player::None ) {
+        return false;
+    }
+    bool outSet = false;
+    for( ; x_ < 3; ++x_ ) {
+        for( ; y_ < 3; ++y_ ) {
+            if( outSet ) {
+                goto found;
+            }
+            if( board_->getSquareAt( x_, y_ ) == Player::None ) {
+                out = *board_;
+                out.makeMove( x_, y_ );
+                outSet = true;
+            }
+        }
+        y_ = 0;
+    }
+found:
+    return outSet;
+}
+
 Board::Board()
 : data_( TURN_MASK )
 {
@@ -63,20 +108,18 @@ bool Board::getTurn() const
 
 std::vector<Board> Board::getMoves() const
 {
+    auto itr = getMovesItr();
     std::vector<Board> moves;
-    if( getWinner() != Player::None ) {
-        return moves;
-    }
-    for( unsigned int x = 0; x < 3; ++x ) {
-        for( unsigned int y = 0; y < 3; ++y ) {
-            if( getSquareAt( x, y ) == Player::None ) {
-                Board copy( *this );
-                copy.makeMove( x, y );
-                moves.push_back( copy );
-            }
-        }
+    Board board;
+    while( itr.next( board ) ) {
+        moves.push_back( board );
     }
     return moves;
+}
+
+Board::MoveIterator Board::getMovesItr() const
+{
+    return MoveIterator( this );
 }
 
 void Board::makeMove( unsigned int x, unsigned int y )
